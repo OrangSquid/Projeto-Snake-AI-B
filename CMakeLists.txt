@@ -1,26 +1,37 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.19)
+cmake_minimum_required(VERSION 3.19)
 
-PROJECT(Snake VERSION 0.1)
+project(Snake VERSION 0.1)
 
-SET(CMAKE_C_STANDARD 11)
-SET(CMAKE_C_STANDARD_REQUIRED True)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED True)
 
-ADD_EXECUTABLE(Main 
+add_executable(Projeto_Cobra 
                src/main.c
                src/snake_classico.c
                src/labirinto.c
                src/core.c)
 
-TARGET_INCLUDE_DIRECTORIES(Main PUBLIC
+target_include_directories(Projeto_Cobra PUBLIC
                            "include/conio21")
 
-TARGET_LINK_LIBRARIES(Main conio_unicode_64)
+target_link_libraries(Projeto_Cobra conio_64)
 
-ADD_EXECUTABLE(getch_test src/getch_test.c)
+set_target_properties(Projeto_Cobra PROPERTIES COMPILE_FLAGS "-save-temps")
 
-TARGET_INCLUDE_DIRECTORIES(getch_test PUBLIC
-                           "include/conio21")
+#set_target_properties(Projeto_Cobra PROPERTIES COMPILE_FLAGS "-Wa,-adhln" )
 
-TARGET_LINK_LIBRARIES(getch_test conio_unicode_64)
+#add_executable(getch_test src/getch_test.c)
+
+#target_include_directories(getch_test PUBLIC
+                           #"include/conio21")
+
+#target_link_libraries(getch_test conio_64)
+
+#add_executable(Sergio src/Projetosnake.c)
+
+#target_include_directories(Sergio PUBLIC
+                          #"include/conio21")
+
+#target_link_libraries(Sergio conio_64)
 
 #ADD_COMPILE_DEFINITIONS(UNICODE _UNICODE)

@@ -1,35 +1,33 @@
-#include "stdio.h"
-#include "conio2.h"
-#include "windows.h"
-#include "stdlib.h"
-#include "snake_classico.h"
+#include <conio2.h>
+#include <stdlib.h>
 #include "core.h"
+#include "snake_classico.h"
 
-void snake_classico() {
+// Macros para calcular a posição dos quadrados da cobra dependendo do index
+#define GET_X(X) (int)(quadrados_cobra[X]-&mapa[0][0])/MAX_JANELA_Y
+#define GET_Y(Y) (int)(quadrados_cobra[Y]-&mapa[0][0])%MAX_JANELA_Y
 
-    clrscr();
-
+void snake_classico(struct Opções opções) {
     // Loop externo para facilitar novas tentativas
     for(;;) {
-        short int acel_x = 1, acel_y = 0, comprimento_cobra = 3, game_over = 0;
-        struct Coordenadas mapa[MAX_JANELA_X][MAX_JANELA_Y];
+        clrscr();
+        int acel_x = 1, acel_y = 0, mapa[MAX_JANELA_X][MAX_JANELA_Y], game_over = 0, index_cabeça = 2, index_cauda = 0, pontuação = 0;
         // Array com pointers para todas as posições da cobra
-        // O primeiro elemento será sempre a cauda
-        // O último elemento será sempre a cabeça
-        struct Coordenadas *quadrados_cobra[MAX_JANELA_X * MAX_JANELA_Y];
+        // index_cabeça e index_cauda indicam a posição da
+        // cabeça e da cauda da cobra
+        int *quadrados_cobra[MAX_JANELA_X * MAX_JANELA_Y + 1];
 
         // Inicializa todas as posições
         for(int x = 0; x < MAX_JANELA_X; x++) {
             for(int y = 0; y < MAX_JANELA_Y; y++) {
-                mapa[x][y].x = x + 1;
-                mapa[x][y].y = y + 1;
-                mapa[x][y].estado = 0;
+                mapa[x][y] = LIVRE;
             }
         }
 
         // * Setup ao jogo
+        // Define posições da cobra e desenha-as
         for(int x = MAX_JANELA_X/2-2, z = 0; x <= MAX_JANELA_X/2; x++, z++) {
-            mapa[x-1][MAX_JANELA_Y/2-1].estado = 1;
+            mapa[x-1][MAX_JANELA_Y/2-1] = COBRA;
             quadrados_cobra[z] = &mapa[x-1][MAX_JANELA_Y/2-1];
             textbackground(BLUE);
             putchxy(x, MAX_JANELA_Y/2, ' ');
@@ -40,9 +38,9 @@ void snake_classico() {
         // * Fim de setup ao jogo
 
         // Loop do jogo
-        for(;;) {
-            // Ver se alguma tecla do foi pressionada
-            if(kbhit()) {
+        while(!game_over) {
+            // Ver se alguma tecla foi pressionada
+            if(kbhit() || !opções.modo_ativo) {
                 switch(getch()) {
                 case 'w':
                     acel_x = 0, acel_y = (acel_y != 0) ? acel_y : -1;
@@ -56,58 +54,70 @@ void snake_classico() {
                 case 'd':
                     acel_x = (acel_x != 0) ? acel_x : 1, acel_y = 0;
                     break;
-                // 27 é o número para o esc do getch
+                // ESCAPE
                 case 27:
-                    if(menu_pausa("Snake Clássico")) return;
-                    else renderizar_mapa(mapa);
+                    clrscr();
+                    switch(menu_pausa(3, &opções)) {
+                    case 0:
+                        desenhar_mapa(mapa);
+                        continue;
+                    case 1:
+                        game_over = 1;
+                        break;
+                    case 3:
+                        return;
+                    }
                     break;
+                default:
+                    continue;
                 }
             }
             // Aplicar o movimento à cabeça
-            int temp_x = quadrados_cobra[comprimento_cobra-1]->x + acel_x;
-            int temp_y = quadrados_cobra[comprimento_cobra-1]->y + acel_y;
+            int temp_x = GET_X(index_cabeça) + acel_x;
+            int temp_y = GET_Y(index_cabeça) + acel_y;
             // Verificar se a cabeça antigiu o limite da janela
             // Em X
-            if(temp_x > MAX_JANELA_X) temp_x = 1;
-            else if(temp_x < 1)       temp_x = MAX_JANELA_X;
+            if(temp_x > MAX_JANELA_X - 1) temp_x = 0;
+            else if(temp_x < 0)           temp_x = MAX_JANELA_X - 1;
             // Em Y
-            if(temp_y > MAX_JANELA_Y) temp_y = 1;
-            else if(temp_y < 1)       temp_y = MAX_JANELA_Y;
+            if(temp_y > MAX_JANELA_Y - 1) temp_y = 0;
+            else if(temp_y < 0)           temp_y = MAX_JANELA_Y - 1;
 
-            quadrados_cobra[comprimento_cobra] = &mapa[temp_x-1][temp_y-1];
+            quadrados_cobra[index_cabeça+1] = &mapa[temp_x][temp_y];
 
-            textbackground(BLUE);
-            putchxy(temp_x, temp_y, ' ');
+    	    textbackground(BLUE);
+            putchxy(temp_x+1, temp_y+1, ' ');
             // Verificar a colisão
-            switch(quadrados_cobra[comprimento_cobra]->estado) {
-            // Lugar livre
-            case 0:
+            switch(*quadrados_cobra[index_cabeça+1]) {
+            case LIVRE: {
                 textbackground(BLACK);
-                putchxy(quadrados_cobra[0]->x, quadrados_cobra[0]->y, ' ');
-                quadrados_cobra[0]->estado = 0;
-                for(int x = 1; x <= comprimento_cobra; x++) {
-                    quadrados_cobra[x-1] = quadrados_cobra[x];
-                }
-                quadrados_cobra[comprimento_cobra] = NULL;
+                putchxy(GET_X(index_cauda)+1, GET_Y(index_cauda)+1, ' ');
+                *quadrados_cobra[index_cauda] = LIVRE;
+                index_cabeça++, index_cauda++;
                 break;
-            // Cobra
-            case 1:
+            }
+            case COBRA:
                 textbackground(BLACK);
                 clrscr();
-                game_over = 1;
-                break;
-            // Fruta
-            case 2:
+                switch(menu_game_over(pontuação)) {
+                case 0:
+                    game_over = 1;
+                    continue;
+                case 1:
+                    return;
+                case 2:
+                    exit(0);
+                }
+            case FRUTA:
+                pontuação = (opções.modo_ativo) ? pontuação + 2 : pontuação + 1;
                 definir_fruta(mapa, 1);
-                comprimento_cobra++;
+                index_cabeça++;
                 break;
             }
-            quadrados_cobra[comprimento_cobra-1]->estado = 1;
-            if(game_over) {
-                game_over = 0;
-                break;
-            }
-            Sleep(30);
+            if(index_cabeça > MAX_JANELA_X * MAX_JANELA_Y - 1) index_cabeça = 0;
+            if(index_cauda > MAX_JANELA_X * MAX_JANELA_Y - 1) index_cauda = 0;
+            *quadrados_cobra[index_cabeça] = COBRA;
+            delay(opções.velocidade);
         }
     }
 }
