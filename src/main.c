@@ -2,15 +2,21 @@
 #include <time.h>
 #include <windows.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include "core.h"
 #include "snake_classico.h"
 #include "labirinto.h"
 
-char opções_menu[5][30] = {
+char opções_menu[4][30] = {
     "1> Maker de Labirintos",
     "2> Snake Clássico",
     "3> Opções",
     "4> Sair do Jogo"
+};
+
+char opções_submenu[2][30] = {
+    "1> Labirinto",
+    "2> Snake Clássico"
 };
 
 void print_menu() {
@@ -28,6 +34,81 @@ void print_menu() {
     printfxy(50, 22, opções_menu[3], WHITE, BLACK);
 }
 
+int menu_input() {
+    // Função responsável pela interatividade do menu
+    int opção = 0;
+    for(;;) {
+        switch(getch()) {
+        case '1':
+            return 0;
+        case '2':
+            return 1;
+        case '3':
+            return 2;
+        case '4':
+            exit(0);
+        // ENTER
+        case 13:
+            return opção;
+        // SETAS
+        case 224:
+            // Deseleciona a antiga opção
+            printfxy(50, 16 + opção * 2, opções_menu[opção], WHITE, BLACK);
+            switch(getch()) {
+            case CIMA:
+                opção--;
+                break;
+            case BAIXO:
+                opção++;
+                break;
+            }
+        }
+        if(opção > 3)
+            opção = 0;
+        else if(opção < 0)
+            opção = 3;
+        // Seleciona a nova opção
+        printfxy(50, 16 + opção * 2, opções_menu[opção], BLACK, WHITE);
+    }
+}
+
+int submenu_input() {
+    // Função responsável pela interatividade do menu
+    int opcao = 0;
+    for(;;) {
+        switch(getch()) {
+        case '1':
+            return 0;
+        case '2':
+            return 1;
+        // ENTER
+        case 13:
+            return opcao;
+        // ESC
+        case 27:
+            return 2;
+        // SETAS
+        case 224:
+            // Deseleciona a antiga opção
+            printfxy(67, 20 + opcao, opções_submenu[opcao], WHITE, BLACK);
+            switch(getch()) {
+            case CIMA:
+                opcao--;
+                break;
+            case BAIXO:
+                opcao++;
+                break;
+            }
+        }
+        if(opcao > 1)
+            opcao = 0;
+        else if(opcao < 0)
+            opcao = 1;
+        // Seleciona a nova opção
+        printfxy(67, 20 + opcao, opções_submenu[opcao], BLACK, WHITE);
+    }
+}
+
 int main() {
 
     SetConsoleTitle("Projeto Snake");
@@ -41,8 +122,8 @@ int main() {
         SetConsoleCursorInfo(consoleHandle, &info);
     }
 
-    struct Opções opções_labirinto = {27, 0};
-    struct Opções opções_clássico = {27, 1};
+    Opções opções_labirinto = {27, 0};
+    Opções opções_clássico = {27, 1};
 
     // Define a semente para o RNG
     srand((unsigned int)time(NULL));
@@ -52,68 +133,32 @@ int main() {
     // Obrigado Windows
     system("chcp 65001");
 
-    clrscr();
-
-    int opção = 0, última_opção = 0;
-    print_menu();
     for(;;) {
-        textbackground(BLACK);
-        textcolor(WHITE);
-        switch(getch()) {
-        case 'W':
-        case 'w':
-           // Deseleciona a antiga opção
-            última_opção = opção;
-            opção--;
-            break;
-        case 'S':
-        case 's':
-            última_opção = opção;
-            opção++;
-            break;
-        case '1':
+        clrscr();
+        print_menu();
+        switch(menu_input()) {
+        case 0:
             labirinto(opções_labirinto);
-            opção = 0;
             break;
-        case '2':
+        case 1:
             snake_classico(opções_clássico);
-            opção = 0;
             break;
-        case '3':
-            clrscr();
-            menu_opções(0, &opções_labirinto);
-            opção = 0;
-            break;
-        case '4':
-            return 0;
-        // 13 é o número do enter do getch
-        case 13:
-            switch(opção) {
+        case 2:
+            printfxy(67, 20, "1> Labirinto", BLACK, WHITE);
+            printfxy(67, 21, "2> Snake Clássico", WHITE, BLACK);
+            switch(submenu_input()) {
             case 0:
-                labirinto(opções_labirinto);
-                break;
-            case 1:
-                snake_classico(opções_clássico);
-                break;
-            case 2:
-                clrscr();
                 menu_opções(0, &opções_labirinto);
                 break;
-            case 3:
-                return 0;
+            case 1:
+                menu_opções(1, &opções_clássico);
+                break;
+            case 2:
+                break;
             }
-            clrscr();
-            print_menu();
-            opção = 0;
             break;
+        case 3:
+            return 0;
         }
-        if(opção > 3)
-            opção = 0;
-        else if(opção < 0)
-            opção = 3;
-        // Deseleciona a antiga opção
-        printfxy(50, 16 + última_opção * 2, opções_menu[última_opção], WHITE, BLACK);
-        // Seleciona a nova opção
-        printfxy(50, 16 + opção * 2, opções_menu[opção], BLACK, WHITE);
     }
 }

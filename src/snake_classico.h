@@ -1,3 +1,3 @@
 #pragma once
 
-void snake_classico();
+void snake_classico(Opções opções);
