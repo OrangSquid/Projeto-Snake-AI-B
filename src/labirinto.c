@@ -1,6 +1,7 @@
 #include <conio2.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
 #include "core.h"
 #include "labirinto.h"
 
@@ -15,17 +16,12 @@ enum modos_de_desenho {
     BORRACHA
 };
 
-void setup_cobra(int mapa[][MAX_JANELA_Y], int *quadrados_cobra[MAX_JANELA_X * MAX_JANELA_Y + 1], bool limpar_mapa) {
+void setup_cobra(struct char_info mapa[], bool limpar_mapa, int quadrados_cobra_x[], int quadrados_cobra_y[]) {
     // "Petrifica" a cobra e a fruta que restou para a próxima jogada
     if(limpar_mapa) {
-        for(int x = 0; x < MAX_JANELA_X; x++) {
-            for(int y = 0; y < MAX_JANELA_Y; y++) {
-                switch(mapa[x][y]) {
-                case COBRA:
-                    mapa[x][y] = PAREDE;
-                case FRUTA:
-                    mapa[x][y] = PAREDE;
-                }
+        for(int x = 0; x < N_QUADRICULAS; x++) {
+            if(mapa[x].attr != LIVRE_ATTR) {
+                mapa[x].attr = PAREDE_ATTR;
             }
         }
     }
@@ -33,127 +29,96 @@ void setup_cobra(int mapa[][MAX_JANELA_Y], int *quadrados_cobra[MAX_JANELA_X * M
     // Definir posição aleatória da cobra
     int cobra_x, cobra_y;
     do {
-        cobra_x = rand()%MAX_JANELA_X+1;
-        cobra_y = rand()%MAX_JANELA_Y+1;
-    } while(mapa[cobra_x-1][cobra_y-1] != LIVRE);
-    mapa[cobra_x-1][cobra_y-1] = COBRA;
-    quadrados_cobra[0] = &mapa[cobra_x-1][cobra_y-1];
-    textbackground(BLUE);
-    putchxy(cobra_x, cobra_y, ' ');
+        cobra_x = rand()%MAX_JANELA_X;
+        cobra_y = rand()%MAX_JANELA_Y;
+    } while(mapa[GET_POS(cobra_x, cobra_y)].attr != LIVRE_ATTR);
 
-    // Extender em mais COMPRIMENTO_PADRÃO - 1 a cobra
-    for(int x = 1; x < COMPRIMENTO_PADRÃO; x++) {
-        cobra_x++;
-        mapa[cobra_x-1][cobra_y-1] = COBRA;
-        quadrados_cobra[x] = &mapa[cobra_x-1][cobra_y-1];
-        textbackground(BLUE);
-        putchxy(cobra_x, cobra_y, ' ');
+    textattr(COBRA_ATTR);
+    for(int x = 0; x < COMPRIMENTO_PADRÃO; x++) {
+        quadrados_cobra_x[x] = cobra_x + x;
+        quadrados_cobra_y[x] = cobra_y;
+        putchxy(cobra_x + x, cobra_y, ' ');
+        mapa[GET_POS(cobra_x+x, cobra_y)].attr = COBRA_ATTR;
     }
-    textbackground(BLACK);
+    textattr(LIVRE_ATTR);
 }
 
 void labirinto(Opções opções) {
     for(;;) {
         clrscr();
         bool começar_cobra = false, game_over = false;
-        int acel_x = 1, acel_y = 0, mapa[MAX_JANELA_X][MAX_JANELA_Y], index_cabeça = COMPRIMENTO_PADRÃO-1, index_cauda = -1, pontuação = 0;
-        int *quadrados_cobra[MAX_JANELA_X * MAX_JANELA_Y + 1];
+        short int acel_x = 1, acel_y = 0;
+        int index_cabeça = 0, index_cauda, pontuação = 0, modo_labirinto = CURSOR;
 
-        // Define todos os quadrados como livres
-        for(int x = 0; x < MAX_JANELA_X; x++) {
-            for(int y = 0; y < MAX_JANELA_Y; y++) {
-                mapa[x][y] = LIVRE;
-            }
-        }
+        int quadrados_cobra_x[N_QUADRICULAS + 1];
+        int quadrados_cobra_y[N_QUADRICULAS + 1];
+        struct char_info mapa[N_QUADRICULAS];
 
         // Para o modo labirinto o primeiro elemento de quadrados_cobra para
         // poder saber a posição do cursor
-        quadrados_cobra[0] = &mapa[MAX_JANELA_X/2-1][MAX_JANELA_Y/2-1];
+        quadrados_cobra_x[index_cabeça] = MAX_JANELA_X/2;
+        quadrados_cobra_y[index_cabeça] = MAX_JANELA_Y/2;
         textbackground(RED);
         putchxy(MAX_JANELA_X/2, MAX_JANELA_Y/2, ' ');
-        printfxy((MAX_JANELA_X - 38)/2, MAX_JANELA_Y/2 + 3, "Pressione Q para desenhar o labirinto", WHITE, BLACK);
-        printfxy((MAX_JANELA_X - 45)/2, MAX_JANELA_Y/2 + 4, "Pressione E para usar a borracha o labirinto", WHITE, BLACK);
-        printfxy((MAX_JANELA_X - 38)/2, MAX_JANELA_Y/2 + 5, "Pressione S para terminar o labirinto", WHITE, BLACK);
-        printfxy((MAX_JANELA_X - 38)/2, MAX_JANELA_Y/2 + 7, "Pressione qualquer tecla para começar", WHITE, BLACK);
+        printfxy((MAX_JANELA_X - 38)/2, MAX_JANELA_Y/2 + 3, "Pressione Q para desenhar o labirinto", MENU_N_SELECIONADO);
+        printfxy((MAX_JANELA_X - 45)/2, MAX_JANELA_Y/2 + 4, "Pressione E para usar a borracha o labirinto", MENU_N_SELECIONADO);
+        printfxy((MAX_JANELA_X - 38)/2, MAX_JANELA_Y/2 + 5, "Pressione S para terminar o labirinto", MENU_N_SELECIONADO);
+        printfxy((MAX_JANELA_X - 38)/2, MAX_JANELA_Y/2 + 7, "Pressione qualquer tecla para começar", MENU_N_SELECIONADO);
         getch();
+        textattr(LIVRE_ATTR);
         clrscr();
         textbackground(RED);
         putchxy(MAX_JANELA_X/2, MAX_JANELA_Y/2, ' ');
 
-        int modo_labirinto = CURSOR;
         // Loop do labirinto
         while(!começar_cobra) {
-            int antigo_x = GET_X(0), antigo_y = GET_Y(0);
-            int novo_x = antigo_x, novo_y = antigo_y;
             switch(getch()) {
             case 224:
                 switch(getch()) {
                 case CIMA:
-                    novo_y = antigo_y - 1;
+                    acel_x = 0, acel_y = -1;
                     break;
                 case BAIXO:
-                    novo_y = antigo_y + 1;
+                    acel_x = 0, acel_y = 1;
                     break;
                 case ESQUERDA:
-                    novo_x = antigo_x - 1;
+                    acel_x = -1, acel_y = 0;
                     break;
                 case DIREITA:
-                    novo_x = antigo_x + 1;
+                    acel_x = 1, acel_y = 0;
                     break;
                 }
                 break;
-            case 'Q':
-            case 'q':
-                if(modo_labirinto != DESENHAR) {
-                    textbackground(LIGHTRED);
-                    putchxy(antigo_x+1, antigo_y+1, ' ');
-                    modo_labirinto = DESENHAR;
-                    mapa[antigo_x][antigo_y] = PAREDE;
-                }
-                else {
-                    textbackground(RED);
-                    putchxy(antigo_x+1, antigo_y+1, ' ');
-                    modo_labirinto = CURSOR;
-                }
-                continue;
-            case 'E':
-            case 'e':
-                if(modo_labirinto != BORRACHA) {
-                    textbackground(MAGENTA);
-                    putchxy(antigo_x+1, antigo_y+1, ' ');
-                    modo_labirinto = BORRACHA;
-                    mapa[antigo_x][antigo_y] = LIVRE;
-                }
-                else {
-                    textbackground(RED);
-                    putchxy(antigo_x+1, antigo_y+1, ' ');
-                    modo_labirinto = CURSOR;
-                }
-                continue;
-            case 'S':
             case 's':
+            case 'S':
+                switch(modo_labirinto) {
+                case DESENHAR:
+                    textattr(PAREDE_ATTR);
+                    break;
+                default:
+                    textattr(LIVRE_ATTR);
+                    break;
+                }
+                putchxy(quadrados_cobra_x[index_cabeça], quadrados_cobra_y[index_cabeça], ' ');
                 começar_cobra = true;
-                // Ter a certeza que a última posição é desenhada com a cor certa
-                if(mapa[antigo_x][antigo_y] != PAREDE) {
-                    textbackground(BLACK);
-                    putchxy(antigo_x+1, antigo_y+1, ' ');
-                }
-                else {
-                    textbackground(RED);
-                    putchxy(antigo_x+1, antigo_y+1, ' ');
-                }
-                // A troca de começar_cobra para true força a que o loop termine após o continue
                 continue;
+            case 'q':
+            case 'Q':
+                modo_labirinto = (modo_labirinto != DESENHAR) ? DESENHAR : CURSOR;
+                acel_x = 0, acel_y = 0;
+                break;
+            case 'e':
+            case 'E':
+                modo_labirinto = (modo_labirinto != BORRACHA) ? BORRACHA : CURSOR;
+                acel_x = 0, acel_y = 0;
+                break;
             // ESCAPE
-            case 27: {
-                int estado_antigo = mapa[antigo_x][antigo_y];
-                // Define um estado temporário do cursor para desenhar corretamente
-                // o cursor após a pausa
-                mapa[antigo_x][antigo_y] = 4 + modo_labirinto;
-                textbackground(BLACK);
+            case 27:
+                _conio_gettext(1, 1, MAX_JANELA_X, MAX_JANELA_Y, mapa);
+                textattr(LIVRE_ATTR);
                 switch(menu_pausa(2, &opções)) {
                 case 0: // Retomar
-                    desenhar_mapa(mapa);
+                    puttext(1, 1, MAX_JANELA_X, MAX_JANELA_Y, mapa);
                     break;
                 case 1: // Reiniciar
                     começar_cobra = true;
@@ -162,57 +127,72 @@ void labirinto(Opções opções) {
                 case 3:
                     return;
                 }
-                mapa[antigo_x][antigo_y] = estado_antigo;
+                switch(modo_labirinto) {
+                case DESENHAR:
+                    mapa[GET_POS(quadrados_cobra_x[index_cabeça], quadrados_cobra_y[index_cabeça])].attr = PAREDE_ATTR;
+                default:
+                    mapa[GET_POS(quadrados_cobra_x[index_cabeça], quadrados_cobra_y[index_cabeça])].attr = LIVRE_ATTR;
+                }
                 continue;
-            }
             default:
                 continue;
             }
+            // Aplicar o movimento à cabeça
+            int temp_x = quadrados_cobra_x[index_cabeça] + acel_x;
+            int temp_y = quadrados_cobra_y[index_cabeça] + acel_y;
             // Verificar se a cabeça antigiu o limite da janela
             // Em X
-            if(novo_x > MAX_JANELA_X - 1)
-                novo_x = 0;
-            else if(novo_x < 0)
-                novo_x = MAX_JANELA_X - 1;
+            if(temp_x > MAX_JANELA_X) 
+                temp_x = 1;
+            else if(temp_x < 1)           
+                temp_x = MAX_JANELA_X;
             // Em Y
-            if(novo_y > MAX_JANELA_Y - 1)
-                novo_y = 0;
-            else if(novo_y < 0)
-                novo_y = MAX_JANELA_Y - 1;
+            if(temp_y > MAX_JANELA_Y) 
+                temp_y = 1;
+            else if(temp_y < 1)           
+                temp_y = MAX_JANELA_Y;
 
-            quadrados_cobra[0] = &mapa[novo_x][novo_y];
+            switch(modo_labirinto) {
+            case DESENHAR:
+                mapa[GET_POS(quadrados_cobra_x[index_cabeça], quadrados_cobra_y[index_cabeça])].attr = PAREDE_ATTR;
+                break;
+            case BORRACHA:
+                mapa[GET_POS(quadrados_cobra_x[index_cabeça], quadrados_cobra_y[index_cabeça])].attr = LIVRE_ATTR;
+                break;
+            }
+            
+            textattr(mapa[GET_POS(quadrados_cobra_x[index_cabeça], quadrados_cobra_y[index_cabeça])].attr);
+            putchxy(quadrados_cobra_x[index_cabeça], quadrados_cobra_y[index_cabeça], ' ');
+            
+            // Verificar se index_cabeça ultrapassa o limite de N_QUADRICULAS
+            index_cabeça = (index_cabeça+1 > N_QUADRICULAS) ? 0 : index_cabeça + 1;
+            quadrados_cobra_x[index_cabeça] = temp_x;
+            quadrados_cobra_y[index_cabeça] = temp_y;
+
             switch(modo_labirinto) {
             case CURSOR:
-                textbackground(RED);
+                textattr(PAREDE_ATTR);
                 break;
             case DESENHAR:
                 textbackground(LIGHTRED);
-                mapa[novo_x][novo_y] = PAREDE;
                 break;
             case BORRACHA:
                 textbackground(MAGENTA);
-                mapa[novo_x][novo_y] = LIVRE;
                 break;
             }
-            putchxy(novo_x+1, novo_y+1, ' ');
-
-            switch(mapa[antigo_x][antigo_y]) {
-            case LIVRE:
-                textbackground(BLACK);
-                break;
-            case PAREDE:
-                textbackground(RED);
-                break;
-            }
-            putchxy(antigo_x+1, antigo_y+1, ' ');
+            putchxy(temp_x, temp_y, ' ');
         }
         // * Fim Loop Labirinto
+        _conio_gettext(1, 1, MAX_JANELA_X, MAX_JANELA_Y, mapa);
 
-        setup_cobra(mapa, quadrados_cobra, false);
+        setup_cobra(mapa, false, quadrados_cobra_x, quadrados_cobra_y);
 
         // Loop da cobra
         int frutas = FRUTAS;
+        index_cabeça = COMPRIMENTO_PADRÃO-1;
+        index_cauda = -1;
         while(!game_over) {
+            TICK(cobra_time);
             if(kbhit() || !opções.modo_ativo) {
                 switch(getch()) {
                 case 224:
@@ -233,9 +213,10 @@ void labirinto(Opções opções) {
                     break;
                 // ESCAPE
                 case 27:
+                    _conio_gettext(1, 1, MAX_JANELA_X, MAX_JANELA_Y, mapa);
                     switch(menu_pausa(2, &opções)) {
                     case 0: // Retomar
-                        desenhar_mapa(mapa);
+                        puttext(1, 1, MAX_JANELA_X, MAX_JANELA_Y, mapa);
                         continue;
                     case 1: // Reiniciar
                         game_over = true;
@@ -249,41 +230,46 @@ void labirinto(Opções opções) {
                 }
             }
             // Aplicar o movimento à cabeça
-            int temp_x = GET_X(index_cabeça) + acel_x;
-            int temp_y = GET_Y(index_cabeça) + acel_y;
+            int temp_x = quadrados_cobra_x[index_cabeça] + acel_x;
+            int temp_y = quadrados_cobra_y[index_cabeça] + acel_y;
             // Verificar se a cabeça antigiu o limite da janela
             // Em X
-            if(temp_x > MAX_JANELA_X - 1) 
-                temp_x = 0;
-            else if(temp_x < 0)           
-                temp_x = MAX_JANELA_X - 1;
+            if(temp_x > MAX_JANELA_X) 
+                temp_x = 1;
+            else if(temp_x < 1)           
+                temp_x = MAX_JANELA_X;
             // Em Y
-            if(temp_y > MAX_JANELA_Y - 1) 
-                temp_y = 0;
-            else if(temp_y < 0)           
-                temp_y = MAX_JANELA_Y - 1;
+            if(temp_y > MAX_JANELA_Y) 
+                temp_y = 1;
+            else if(temp_y < 1)           
+                temp_y = MAX_JANELA_Y;
 
             // Desenhar nova posição da cobra
-            textbackground(BLUE);
-            putchxy(temp_x+1, temp_y+1, ' ');
+            textattr(COBRA_ATTR);
+            putchxy(temp_x, temp_y, ' ');
 
-            // Verificar se index_cabeça ultrapassa o limite de MAX_JANELA_X * MAX_JANELA_Y
-            index_cabeça = (index_cabeça+1 > MAX_JANELA_X * MAX_JANELA_Y) ? 0 : index_cabeça + 1;
-            quadrados_cobra[index_cabeça] = &mapa[temp_x][temp_y];
+            // Verificar se index_cabeça ultrapassa o limite de N_QUADRICULAS
+            index_cabeça = (index_cabeça+1 > N_QUADRICULAS) ? 0 : index_cabeça + 1;
+            quadrados_cobra_x[index_cabeça] = temp_x;
+            quadrados_cobra_y[index_cabeça] = temp_y;
 
             // Verificar o mesmo para index_cauda
-            index_cauda = (index_cauda+1 > MAX_JANELA_X * MAX_JANELA_Y) ? 0 : index_cauda + 1;
-            textbackground(BLACK);
-            putchxy(GET_X(index_cauda)+1, GET_Y(index_cauda)+1, ' ');
-            *quadrados_cobra[index_cauda] = LIVRE;
+            index_cauda = (index_cauda+1 > N_QUADRICULAS) ? 0 : index_cauda + 1;
+            textattr(7);
+            putchxy(quadrados_cobra_x[index_cauda], quadrados_cobra_y[index_cauda], ' ');
+            mapa[GET_POS(quadrados_cobra_x[index_cauda], quadrados_cobra_y[index_cauda])].attr = LIVRE_ATTR;
 
             // Verificar a colisão
-            switch(*quadrados_cobra[index_cabeça]) {
-            case PAREDE:
-            case COBRA:
-                textbackground(BLACK);
+            switch(mapa[GET_POS(temp_x, temp_y)].attr) {
+            case PAREDE_ATTR:
+            case COBRA_ATTR:
+                textattr(7);
                 switch(menu_game_over(pontuação, false)) {
                 case 0: // Tentar de Novo
+                    // Limpar mapa
+                    textattr(7);
+                    clrscr();
+                    _conio_gettext(1, 1, MAX_JANELA_X, MAX_JANELA_Y, mapa);
                     game_over = true;
                     continue;
                 case 1: // Menu Principal
@@ -292,18 +278,18 @@ void labirinto(Opções opções) {
                     exit(0);
                 }
                 break;
-            case FRUTA:
+            case FRUTA_ATTR:
                 pontuação = (opções.modo_ativo) ? pontuação + 2 : pontuação + 1;
                 frutas--;
                 // Condição para ganhar
                 if(frutas == 0) {
-                    textbackground(BLACK);
+                    textattr(7);
                     // Esperar pelo input de menu_game_over
                     switch(menu_game_over(pontuação, 1)) {
                     case 0: // Continuar
                         clrscr();
-                        setup_cobra(mapa, quadrados_cobra, true);
-                        desenhar_mapa(mapa);
+                        setup_cobra(mapa, true, quadrados_cobra_x, quadrados_cobra_y);
+                        puttext(1, 1, MAX_JANELA_X, MAX_JANELA_Y, mapa);
                         frutas = FRUTAS;
                         index_cabeça = COMPRIMENTO_PADRÃO-1;
                         index_cauda = -1;
@@ -318,8 +304,13 @@ void labirinto(Opções opções) {
                 }
                 break;
             }
-            *quadrados_cobra[index_cabeça] = COBRA;
-            delay(opções.velocidade);
+            mapa[GET_POS(temp_x, temp_y)].attr = COBRA_ATTR;
+            if(opções.velocidade-TOCK(cobra_time) <= 0) {
+                delay(1);
+            }
+            else {
+                delay(opções.velocidade-TOCK(cobra_time));
+            }
         }
     }
 }

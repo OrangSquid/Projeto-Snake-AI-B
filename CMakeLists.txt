@@ -16,4 +16,12 @@ target_include_directories(Projeto_Cobra PUBLIC
 
 target_link_libraries(Projeto_Cobra conio_64)
 
+add_executable(Henrique 
+               src/henrique.c)
+
+target_include_directories(Henrique PUBLIC
+                           "include/conio21")
+
+target_link_libraries(Henrique conio_64)
+
 set_target_properties(Projeto_Cobra PROPERTIES COMPILE_FLAGS "-save-temps")
