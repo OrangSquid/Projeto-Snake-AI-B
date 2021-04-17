@@ -12,7 +12,7 @@ void printfxy(int x, int y, char* text, int attribute) {
     textattr(attribute);
     gotoxy(x, y);
     printf("%s", text);
-    textattr(15);
+    textattr(7);
 }
 
 void definir_fruta(struct char_info mapa[], int n_frutas) {
